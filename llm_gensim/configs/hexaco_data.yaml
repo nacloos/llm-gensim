@@ -1,0 +1,135 @@
+# data from https://hexaco.org/downloads/descriptives_100.pdf
+# results for self-report form (Total column = both men and women)
+factors:
+  # Honesty-Humility
+  - name: Sincerity
+    category: Honesty-Humility
+    alpha: 0.65
+    mean: 3.20
+    sd: 0.78
+  - name: Fairness
+    category: Honesty-Humility
+    alpha: 0.76
+    mean: 3.34
+    sd: 0.98
+  - name: Greed Avoidance
+    category: Honesty-Humility
+    alpha: 0.84
+    mean: 2.72
+    sd: 0.98
+  - name: Modesty
+    category: Honesty-Humility
+    alpha: 0.69
+    mean: 3.49
+    sd: 0.78
+  # Emotionality
+  - name: Fearfulness
+    category: Emotionality
+    alpha: 0.73
+    mean: 3.06
+    sd: 0.89
+  - name: Anxiety
+    category: Emotionality
+    alpha: 0.68
+    mean: 3.69
+    sd: 0.81
+  - name: Dependence
+    category: Emotionality
+    alpha: 0.79
+    mean: 3.38
+    sd: 0.87
+  - name: Sentimentality
+    category: Emotionality
+    alpha: 0.71
+    mean: 3.58
+    sd: 0.80
+  # Extraversion
+  - name: Social Self-Esteem
+    category: Extraversion
+    alpha: 0.68
+    mean: 3.85
+    sd: 0.68
+  - name: Social Boldness
+    category: Extraversion
+    alpha: 0.74
+    mean: 3.03
+    sd: 0.87
+  - name: Sociability
+    category: Extraversion
+    alpha: 0.69
+    mean: 3.59
+    sd: 0.75
+  - name: Liveliness
+    category: Extraversion
+    alpha: 0.77
+    mean: 3.52
+    sd: 0.77
+  # Agreeableness
+  - name: Forgiveness
+    category: Agreeableness
+    alpha: 0.75
+    mean: 2.75
+    sd: 0.83
+  - name: Gentleness
+    category: Agreeableness
+    alpha: 0.66
+    mean: 3.17
+    sd: 0.73
+  - name: Flexibility
+    category: Agreeableness
+    alpha: 0.59
+    mean: 2.74
+    sd: 0.72
+  - name: Patience
+    category: Agreeableness
+    alpha: 0.77
+    mean: 3.11
+    sd: 0.86
+  # Conscientiousness
+  - name: Organization
+    category: Conscientiousness
+    alpha: 0.72
+    mean: 3.26
+    sd: 0.91
+  - name: Diligence
+    category: Conscientiousness
+    alpha: 0.67
+    mean: 3.79
+    sd: 0.68
+  - name: Perfectionism
+    category: Conscientiousness
+    alpha: 0.68
+    mean: 3.50
+    sd: 0.78
+  - name: Prudence
+    category: Conscientiousness
+    alpha: 0.69
+    mean: 3.18
+    sd: 0.75
+  # Openness to Experience
+  - name: Aesthetic Appreciation
+    category: Openness to Experience
+    alpha: 0.65
+    mean: 3.34
+    sd: 0.88
+  - name: Inquisitiveness
+    category: Openness to Experience
+    alpha: 0.63
+    mean: 3.19
+    sd: 0.88
+  - name: Creativity
+    category: Openness to Experience
+    alpha: 0.74
+    mean: 3.63
+    sd: 0.85
+  - name: Unconventionality
+    category: Openness to Experience
+    alpha: 0.50
+    mean: 3.46
+    sd: 0.64
+  # Altruism (Interstitial scale)
+  - name: Altruism
+    category: Interstitial
+    alpha: 0.62
+    mean: 3.90
+    sd: 0.67

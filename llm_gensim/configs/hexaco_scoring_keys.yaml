@@ -1,0 +1,38 @@
+# https://hexaco.org/downloads/ScoringKeys_100.pdf
+hexaco_scoring_keys:
+  Honesty-Humility:
+    Sincerity: [6, 30, 54, 78]
+    Fairness: [12, 36, 60, 84]
+    Greed Avoidance: [18, 42, 66, 90]
+    Modesty: [24, 48, 72, 96]
+  Emotionality:
+    Fearfulness: [5, 29, 53, 77]
+    Anxiety: [11, 35, 59, 83]
+    Dependence: [17, 41, 65, 89]
+    Sentimentality: [23, 47, 71, 95]
+  Extraversion:
+    Social Self-Esteem: [4, 28, 52, 76]
+    Social Boldness: [10, 34, 58, 82]
+    Sociability: [16, 40, 64, 88]
+    Liveliness: [22, 46, 70, 94]
+  Agreeableness:
+    Forgiveness: [3, 27, 51, 75]
+    Gentleness: [9, 33, 57, 81]
+    Flexibility: [15, 39, 63, 87]
+    Patience: [21, 45, 69, 93]
+  Conscientiousness:
+    Organization: [2, 26, 50, 74]
+    Diligence: [8, 32, 56, 80]
+    Perfectionism: [14, 38, 62, 86]
+    Prudence: [20, 44, 68, 92]
+  Openness to Experience:
+    Aesthetic Appreciation: [1, 25, 49, 73]
+    Inquisitiveness: [7, 31, 55, 79]
+    Creativity: [13, 37, 61, 85]
+    Unconventionality: [19, 43, 67, 91]
+
+reverse_keyed: [
+  1, 6, 9, 10, 12, 13, 15, 16, 19, 20, 21, 25, 29, 35, 36, 38, 41, 42, 
+  44, 50, 51, 52, 53, 54, 55, 56, 59, 63, 66, 67, 70, 72, 74, 76, 77, 
+  79, 80, 82, 84, 85, 87, 89, 90, 91, 92, 94, 95, 96
+]

@@ -1,0 +1,133 @@
+steps:
+- prompt: |
+    You are a helpful assistant.
+    Generate a list of 100 concrete daily activities.
+
+    Write your output as a yaml list of strings (snake case, valid python variable names). Add a comment describing each activity. Output only one yaml block.
+    Format:
+    ```yaml
+    - ...  # comment describing the activity
+    ```
+
+    Your answer:
+  output_name: actions
+  output_type: yaml
+
+# - prompt: |
+#     You are a helpful assistant.
+#     Here is a list of activities that an agent can do. Write a list of variables that describe the internal state of the agent and that would impact the decisions of the agent. Each variable takes a value between 0 and 100.
+
+#     Activities:
+#     {actions}
+    
+#     Write your output as a yaml list of strings (snake case, valid python variable names). Output only one yaml block.
+#     Format:
+#     ```yaml
+#     - ...
+#     ```
+
+#     Your answer:
+#   output_name: states
+#   output_type: yaml
+
+# - prompt: |
+#     You are a helpful assistant.
+
+#     Given the following list of variables describing the agent's internal state, where each variable takes a value between 0 and 100,
+#     {states}
+
+#     and the following list of activities (actions that the agent can take),
+#     {actions}
+
+#     For each activity, estimate its effect on the agent state variables (the delta to update the value of the variable after taking that activity).
+#     Format your final answer as a yaml config where the first level of keys corresponds to activity and second level corresponds to state variables. Use the exact same activity and state variable names as above.
+
+#     Format:
+#     ```yaml
+#     activity1:
+#         state1: delta
+#         ...
+#     ```
+
+#     where delta is a positive or negative number representing how much the activity changes the state variable.
+#     Make sure the activities and state variables in the effects config are present in the two lists above!
+#     First reflect and explain your reasoning. Then write your final answers with the format above (has to be valid yaml configs).
+
+#     Your answer:
+#   output_name: effects
+#   output_type: yaml
+
+# - prompt: |
+#     You are a helpful assistant.
+#     Given the following list of variables describing the agent's internal state, where each variable takes a value between 0 and 100,
+#     {states}
+
+#     And the following list of factors used to evaluate someone's personality traits,
+#     {personality_factors}
+
+#     Write a function to initiate an agent's internal state based on a given personality. The output state should reflect the given personality as closely as possible.
+#     The function should take a dictionary of factors and their values (between 1 and 5) and return a dictionary with the initialized state variables (between 0 and 100).
+
+#     Format:
+#     ```python
+#     def init_state(factors: dict]) -> dict:
+#         # factors: dict of personality factors and their values (between 1 and 5)
+#         # return dict of state variables and their values (between 0 and 100)
+#         # TODO
+#         return state
+#     ```
+
+#     Make sure to include all state variables listed above in the returned initial state!
+#     First reflect and explain your reasoning. Then write your final answers with the format above (has to be valid python code). Output only a single python code block. Don't be lazy and write the entire code.
+
+#     Your answer:
+#   output_name: init_state
+#   output_type: python
+
+- prompt: |
+    You are a helpful assistant.
+    Given the following list of variables describing the agent's internal state, where each variable takes a value between 0 and 100,
+    {states}
+
+    And the following list of activities (actions that the agent can take),
+    {actions}
+
+    Generate a policy as a list of:
+    (lambda state: boolean condition, activity)
+
+    where state is a dictionary {{state_variable: current_value}}, activity is the activity from the activity list above to take when the condition is satisfied by the current agent state.
+    Write your answer as a single python code block. Don't be lazy and write the entire code.
+
+    Format:
+    ```python
+    policy = [
+        (lambda state: ..., "...", ...),
+        ...
+    ]
+    ```
+
+    Your answer:
+  output_name: policy
+  output_type: python
+
+- prompt: |
+    You are a helpful assistant.
+
+    Questions:
+    {questions}
+
+    Activities:
+    {actions}
+
+    For each question in the self-report questionnaire above, write a function that takes a history of activities (a python list) and outputs a list of scores for each questions. Each score should be between 1 and 5 (1=strongly disagree, 5=strongly agree).
+    Write your answer as a single python code block. Don't be lazy and write the entire code.
+
+    Format:
+    ```python
+    def eval(activities: list[str]) -> list[int]:
+      ...
+    ```
+
+    Your answer:
+  output_name: eval
+  output_type: python

@@ -1,0 +1,209 @@
+system_prompt: "You are a software engineer at a major tech company with a strong background in psychology."
+
+steps:
+  actions:
+    prompt: |
+      <instructions>
+      Generate a list of 200 concrete activities reflecting different personality traits.
+      Write your output as a yaml list of strings (snake case, valid python variable names). Add a comment describing each activity. Output only one yaml block.
+      </instructions>
+
+      <format>
+      ```yaml
+      - ...  # comment describing the activity
+      ```
+      </format>
+    output_name: actions
+    output_type: yaml
+
+  policy:
+    prompt: |
+      <states>
+      {states}
+      </states>
+
+      <activities>
+      {actions}
+      </activities>
+      
+      <instructions>
+      Generate a policy that decides which activity to take based on the internal state of the agent. Make sure to include all activities and state variables. State variables are between 0 and 100.
+      Write the policy as a list of (lambda state: boolean condition, activity) tuples, where state is a dictionary {{state_variable: current_value}}, activity is the activity from the activity list above to take when the condition is satisfied by the current agent state.
+      First reflect and then write the python code as a single code block. Don't be lazy and write the entire code.
+      </instructions>
+
+      <format>
+      ```python
+      policy = [
+          (lambda state: ..., "..."),
+          ...
+      ]
+      ```
+      </format>
+    output_name: policy
+    output_type: python
+
+  eval_score:
+    prompt: |
+      <questions>
+      {questions}
+      </questions>
+
+      <activities>
+      {actions}
+      </activities>
+
+      <instructions>
+      For each question in the list above, write code that takes a history of activities (a python list) and outputs the score for that question. Each score should be between 1 and 5 (1=strongly disagree, 5=strongly agree).
+      Implement all the questions. Don't be lazy and write the entire code.
+      </instructions>
+            
+      <format>
+      <q1>
+      def eval_q1(activities: list[str]) -> int:
+          ...
+      </q1>
+
+      <q2>
+      def eval_q2(activities: list[str]) -> int:
+          ...
+      </q2>
+
+      ...
+      </format>
+    output_name: eval_score
+    output_type: python
+
+# - prompt: |
+#     You are a helpful assistant.
+
+#     Given the following list of variables describing the agent's internal state, where each variable takes a value between 0 and 100,
+#     {states}
+
+#     and the following list of activities (actions that the agent can take),
+#     {actions}
+
+#     For each activity, estimate its effect on the agent state variables (the delta to update the value of the variable after taking that activity).
+#     Format your final answer as a yaml config where the first level of keys corresponds to activity and second level corresponds to state variables. Use the exact same activity and state variable names as above.
+
+#     Format:
+#     ```yaml
+#     activity1:
+#         state1: delta
+#         ...
+#     ```
+
+#     where delta is a positive or negative number representing how much the activity changes the state variable.
+#     Make sure the activities and state variables in the effects config are present in the two lists above!
+#     First reflect and explain your reasoning. Then write your final answers with the format above (has to be valid yaml configs).
+
+#     Your answer:
+#   output_name: effects
+#   output_type: yaml
+
+# - prompt: |
+#     You are a helpful assistant.
+#     Given the following list of variables describing the agent's internal state, where each variable takes a value between 0 and 100,
+#     {states}
+
+#     And the following list of factors used to evaluate someone's personality traits,
+#     {personality_factors}
+
+#     Write a function to initiate an agent's internal state based on a given personality. The output state should reflect the given personality as closely as possible.
+#     The function should take a dictionary of factors and their values (between 1 and 5) and return a dictionary with the initialized state variables (between 0 and 100).
+
+#     Format:
+#     ```python
+#     def init_state(factors: dict]) -> dict:
+#         # factors: dict of personality factors and their values (between 1 and 5)
+#         # return dict of state variables and their values (between 0 and 100)
+#         # TODO
+#         return state
+#     ```
+
+#     Make sure to include all state variables listed above in the returned initial state!
+#     First reflect and explain your reasoning. Then write your final answers with the format above (has to be valid python code). Output only a single python code block. Don't be lazy and write the entire code.
+
+#     Your answer:
+#   output_name: init_state
+#   output_type: python
+
+    # You are a helpful assistant.
+# - prompt: |
+#     Questions:
+#     {questions}
+
+#     Activities:
+#     {actions}
+
+#     For each question in the list above, write a function that takes a history of activities (a python list) and outputs a list of scores for each questions. Each score should be between 1 and 5 (1=strongly disagree, 5=strongly agree).
+#     Answer all of the questions based on the activities.
+#     Write your answer as a single python code block. Don't be lazy and write the entire evaluation code. The code has to be complete and return the scores for all of the questions!
+
+#     Format:
+#     ```python
+#     def eval(activities: list[str]) -> list[int]:
+#       ...
+#     ```
+
+#     Your complete answer:
+#   output_name: eval
+#   output_type: python
+
+    # Some of the questions are about personality traits or hypothetical scenarios and might be hard to answer from activities alone. In that case, you can use your best judgement to answer the questions based on the activities.
+
+# - prompt: |
+#     You are a helpful assistant.
+#     Given the following list of variables describing the agent's internal state, where each variable takes a value between 0 and 100,
+#     {states}
+
+#     And the following list of activities (actions that the agent can take),
+#     {actions}
+
+#     Generate a policy as a list of:
+#     (lambda state: boolean condition, activity)
+
+#     where state is a dictionary {{state_variable: current_value}}, activity is the activity from the activity list above to take when the condition is satisfied by the current agent state.
+#     Make sure all the activities are included at least once in the policy!
+#     Write your answer as a single python code block. Don't be lazy and write the entire code.
+
+#     Format:
+#     ```python
+#     policy = [
+#         (lambda state: ..., "...", ...),
+#         ...
+#     ]
+#     ```
+
+#     Your answer:
+#   output_name: policy
+#   output_type: python
+
+
+
+# - prompt: |
+#     <activities>
+#     {actions}
+#     </activities>
+
+#     <question>
+#     If I knew that I could never get caught, I would be willing to steal a million dollars.
+#     </question>
+
+#     <instructions>
+#     Answer this question by giving a score between 1 and 5 (1=strongly disagree, 5=strongly agree) based on the activities done by an agent.
+#     First reflect on which activities are relevant for the question. Be exhaustive. Then explain step by step your reasoning to answer that question.
+#     Finally, write a python function that takes a list of activities and returns the score for the question.
+#     </instructions>
+
+#     <format>
+#     python
+#     def eval(activities: list[str]) -> int:
+#       ...
+
+#     </format>
+
+#     <answer>
+#   output_name: eval
+#   output_type: python
+
