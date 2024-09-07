@@ -3,8 +3,12 @@ system_prompt: "You are a software engineer at a major tech company with a stron
 steps:
   actions:
     prompt: |
+      <questions>
+      {questions}
+      </questions>
+
       <instructions>
-      Generate a list of 200 concrete activities reflecting different personality traits.
+      Write a list of 200 concrete activities that I should keep track of to answer the questions above. Each action is a concrete daily activity that someone might do.
       Write your output as a yaml list of strings (snake case, valid python variable names). Add a comment describing each activity. Output only one yaml block.
       </instructions>
 

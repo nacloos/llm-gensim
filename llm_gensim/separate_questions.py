@@ -37,16 +37,22 @@ def get_completion(messages: list[dict], model_name, system_prompt="", temperatu
     return message.content[0].text
 
 
-def make_eval_code(gen_pipeline: GenPipeline, step: GenPipelineStep, save_dir):
+def make_eval_code(gen_pipeline: GenPipeline, step: GenPipelineStep, save_dir, num_questions=100):
     save_dir.mkdir(parents=True, exist_ok=True)
+
+    # save prompt if doesn't exist
+    if not (save_dir / "prompt.md").exists():
+        with open(save_dir / "prompt.md", "w") as f:
+            f.write(step.prompt.format(**gen_pipeline.context_vars))
 
     messages = [
         {"role": "user", "content": step.prompt.format(**gen_pipeline.context_vars)}
     ]
 
-    question_blocks = []
+    utils_blocks = []
+    question_blocks_dict = {}
     i = 1
-    while len(question_blocks) < 100:
+    while len(question_blocks_dict) < num_questions:
         if not (save_dir / f"answer{i}.md").exists():
             print(f"Generating answer{i}.md")
             # save messages
@@ -64,25 +70,35 @@ def make_eval_code(gen_pipeline: GenPipeline, step: GenPipelineStep, save_dir):
             answer = open(save_dir / f"answer{i}.md", "r").read()
 
         # extract question blocks from answer
-        blocks = re.findall(r'<q\d+>(.*?)</q\d+>', answer, re.DOTALL)
-        question_blocks.extend(blocks)
+        blocks = re.findall(r'<q(\d+)>(.*?)</q\d+>', answer, re.DOTALL)
+        for num, content in blocks:
+            if num not in question_blocks_dict:
+                question_blocks_dict[num] = content
 
-        if len(question_blocks) < 100:
+        utils_blocks.extend(re.findall(r'<utils>(.*?)</utils>', answer, re.DOTALL))
+
+        if len(question_blocks_dict) < num_questions:
             messages += [
                 {"role": "assistant", "content": answer},
-                {"role": "user", "content": "Continue implementing the code."}
+                {"role": "user", "content": "Continue implementing the code. Rewrite the last block of code in your previous answer if it was truncated."}
             ]
             i += 1
 
-    # concatenate question blocks and write in python file
+    utils_code = "\n\n".join(utils_blocks)
+    utils_code = "\n".join([f"    {line}" for line in utils_code.split("\n")])
+
+    question_blocks = [question_blocks_dict[k] for k in sorted(question_blocks_dict.keys())]
     questions_code = "\n\n".join(question_blocks)
     # indent question code
     questions_code = "\n".join([f"    {line}" for line in questions_code.split("\n")])
 
-    score_list = "[" + ", ".join([f"eval_q{i}(activities)" for i in range(1, 101)]) + "]"
+    score_list = "[" + ", ".join([f"q{i}(activities)" for i in range(1, 101)]) + "]"
     # place the question code inside a function eval_score
     code = f"""
 def eval_score(activities: list[str]) -> list[int]:
+    # utils
+    {utils_code}
+
     # eval questions
     {questions_code}
     
@@ -102,6 +118,90 @@ def eval_score(activities: list[str]) -> list[int]:
     gen_pipeline.outputs["eval_score"] = parsed_output
     return
 
+
+def make_policy_code(gen_pipeline: GenPipeline, step: GenPipelineStep, save_dir):
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    # save prompt if doesn't exist
+    if not (save_dir / "prompt.md").exists():
+        with open(save_dir / "prompt.md", "w") as f:
+            f.write(step.prompt.format(**gen_pipeline.context_vars))
+
+    messages = [
+        {"role": "user", "content": step.prompt.format(**gen_pipeline.context_vars)}
+    ]
+    utils_blocks = []
+    policy_blocks_dict = {}
+    i = 1
+    while len(policy_blocks_dict) < len(gen_pipeline.outputs["actions"]):
+        if not (save_dir / f"answer{i}.md").exists():
+            print(f"Generating answer{i}.md")
+            answer = get_completion(messages, gen_pipeline.llm_name, system_prompt=gen_pipeline.system_prompt)
+            with open(save_dir / f"answer{i}.md", "w") as f:
+                f.write(answer)
+        else:
+            print(f"Loading answer{i}.md")
+            answer = open(save_dir / f"answer{i}.md", "r").read()
+
+        blocks = re.findall(r'<a(\d+)>(.*?)</a\d+>', answer, re.DOTALL)
+        for num, content in blocks:
+            # make sure don't have duplicate blocks because the code for an activity might be repeated twice in two consecutive answers
+            if num not in policy_blocks_dict:
+                policy_blocks_dict[num] = content
+
+        utils_blocks.extend(re.findall(r'<utils>(.*?)</utils>', answer, re.DOTALL))
+
+        if len(policy_blocks_dict) < len(gen_pipeline.outputs["actions"]):
+            messages += [
+                {"role": "assistant", "content": answer},
+                {"role": "user", "content": "Continue implementing the code. Rewrite the last block of code in your previous answer if it was truncated."}
+            ]
+            i += 1
+
+
+    utils_code = "\n\n".join(utils_blocks)
+    utils_code = "\n".join([f"    {line}" for line in utils_code.split("\n")])
+
+    policy_blocks = [policy_blocks_dict[k] for k in sorted(policy_blocks_dict.keys())]
+    policy_code = "\n\n".join(policy_blocks)
+    policy_code = "\n".join([f"    {line}" for line in policy_code.split("\n")])
+
+    proba_list = "[" + ", ".join([f"a{i}(state)" for i in range(1, len(gen_pipeline.outputs["actions"])+1)]) + "]"
+
+    code = f"""
+def policy(state: dict) -> str:
+    # utils
+    {utils_code}
+
+    # policy
+    {policy_code}
+
+    # TODO: temp fix
+    state = list(state.values())
+    activities = {gen_pipeline.outputs["actions"]}
+
+    activity_probabilities = np.array({proba_list})
+    activity_probabilities = activity_probabilities / activity_probabilities.sum()
+    # sample activity
+    activity = np.random.choice(activities, p=activity_probabilities)
+    return activity
+"""
+
+    with open(save_dir / "policy.py", "w") as f:
+        f.write(code)
+
+
+    full_answer = f"```python\n{code}\n```"
+    # save to full answer to answer.md
+    with open(save_dir / "answer.md", "w") as f:
+        f.write(full_answer)
+
+    text_output, parsed_output = parse_output(full_answer, output_type=step.output_type, output_name=step.output_name)
+
+    gen_pipeline.context_vars["policy"] = text_output
+    gen_pipeline.outputs["policy"] = parsed_output
+
+    return
 
 
 def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=True, no_effects=True) -> SimPipeline:
@@ -129,12 +229,16 @@ def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=True, n
     if no_effects:
         outputs['effects'] = {}
 
+    policy_config = gen_pipeline_config["steps"].pop("policy")
+    eval_config = gen_pipeline_config["steps"].pop("eval_score")
+
     # make pipeline
     pipeline = GenPipeline(
         llm_name=model_id,
         llm=llm,
         steps=[
-            GenPipelineStep(**step) for k, step in gen_pipeline_config["steps"].items() if k != "eval_score"
+            GenPipelineStep(**step) for step in gen_pipeline_config["steps"].values()
+            # GenPipelineStep(**step) for k, step in gen_pipeline_config["steps"].items() if k != "eval_score"
         ],
         system_prompt=gen_pipeline_config["system_prompt"],
         save_dir=save_dir,
@@ -147,7 +251,10 @@ def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=True, n
     for step in pipeline.steps:
         gen_pipeline_step(pipeline, step)
 
-    step = GenPipelineStep(**gen_pipeline_config["steps"]["eval_score"])
+    step = GenPipelineStep(**policy_config)
+    make_policy_code(pipeline, step, save_dir / step.output_name)
+
+    step = GenPipelineStep(**eval_config)
     make_eval_code(pipeline, step, save_dir / step.output_name)
 
     if fix_state:
@@ -283,9 +390,12 @@ def eval_pipeline(sim_pipeline: SimPipeline, factor_name: str, num_sim_steps, nu
 
 if __name__ == "__main__":
     model_id = "claude-3-5-sonnet-20240620"
+
     # pipeline_name = "hexaco_state-free_activities-no_effects-test"
     pipeline_name = "hexaco_state-free_activities-separate_questions"
-    batch_name = "batch3"
+    # pipeline_name = "hexaco_state-question_activities-separate_questions"
+
+    batch_name = "batch1"
 
     fix_state = True if "hexaco_state" in pipeline_name else False
     no_effects = True if "no_effects" in pipeline_name else False
@@ -295,7 +405,7 @@ if __name__ == "__main__":
     pipe_save_dir = _save_dir / "gen"
     sim_save_dir = _save_dir / "sim"
 
-    pipeline_path = Path(__file__).parent / "configs" / "pipeline_free_activities" / (pipeline_name + ".yaml")
+    pipeline_path = Path(__file__).parent / "configs" / "separate_questions" / (pipeline_name + ".yaml")
     pipeline_config = yaml.safe_load(pipeline_path.read_text())
 
     sim_pipeline = make_sim_pipeline(model_id, pipeline_config, pipe_save_dir, fix_state, no_effects)

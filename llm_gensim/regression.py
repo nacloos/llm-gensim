@@ -65,22 +65,30 @@ def plot_scatter_regression(personalities_df, activity_frequencies_df, personali
     plt.close()
 
 
-def plot_correlation_heatmap(x_df, y_df, x_label, y_label, save_path):
+def plot_corr_heatmap(x_df, y_df, x_label, y_label, figsize=(30, 15), dpi=300, save_path=None):
     # Calculate correlation matrix
-    correlation_matrix = pd.concat([x_df, y_df], axis=1).corr()
+    corr_matrix = pd.concat([x_df, y_df], axis=1).corr()
 
+    # Select only the correlations between personality factors and activities
+    # x_factors = x_df.columns
+    # y_factors = y_df.columns
+    # correlation_subset = correlation_matrix.loc[x_factors, y_factors].T
     # Select only the correlations between personality factors and activities
     x_factors = x_df.columns
     y_factors = y_df.columns
-    correlation_subset = correlation_matrix.loc[x_factors, y_factors].T
+    corr_subset = corr_matrix.iloc[len(x_factors):, :len(x_factors)]
 
     # Create heatmap
-    plt.figure(figsize=(30, 15), dpi=300)
-    sns.heatmap(correlation_subset, xticklabels=True, yticklabels=True)
+    plt.figure(figsize=figsize, dpi=dpi)
+    palette = sns.diverging_palette(220, 20, as_cmap=True)
+    sns.heatmap(corr_subset, xticklabels=True, yticklabels=True, cmap=palette, center=0)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.tight_layout()
-    plt.savefig(save_path)
+    if save_path:
+        plt.savefig(save_path)
+    else:
+        plt.show()
     plt.close()
 
 
@@ -89,15 +97,21 @@ if __name__ == "__main__":
 
     model_id = "claude-3-5-sonnet-20240620"
     pipeline_name = "hexaco_state-free_activities-separate_questions"
-    batch_name = "batch3"
+    # pipeline_name = "hexaco_state-question_activities-separate_questions"
+    batch_name = "batch1"
+
     pipe_dir = Path(__file__).parent / "results" / "separate_questions" / pipeline_name / model_id / batch_name / "gen"
-    pipeline_path = Path(__file__).parent / "configs" / "pipeline_free_activities" / (pipeline_name + ".yaml")
+
+    save_dir = save_dir / pipeline_name / model_id / batch_name
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    pipeline_path = Path(__file__).parent / "configs" / "separate_questions" / (pipeline_name + ".yaml")
     pipeline_config = yaml.safe_load(pipeline_path.read_text())
 
     sim_pipeline = make_sim_pipeline(model_id, pipeline_config, pipe_dir)
 
 
-    num_samples = 1000
+    num_samples = 5000
     num_sim_steps = 500
 
 
@@ -126,6 +140,8 @@ if __name__ == "__main__":
         personalities_df = pd.DataFrame(personalities)
         activity_frequencies_df = pd.DataFrame(activity_frequencies)
         question_scores_df = pd.DataFrame(question_scores)
+        # question index starts from 1
+        question_scores_df.columns = [f"Q{i}" for i in range(1, len(question_scores_df.columns) + 1)]
         inferred_personalities_df = pd.DataFrame(inferred_personalities)
 
         # save datasets
@@ -139,9 +155,11 @@ if __name__ == "__main__":
         question_scores_df = pd.read_csv(save_dir / "question_scores.csv")
         inferred_personalities_df = pd.read_csv(save_dir / "inferred_personalities.csv")
 
-    plot_correlation_heatmap(activity_frequencies_df, personalities_df, x_label="Activities", y_label="Personality Factors", save_path=save_dir / "correlation_heatmap.png")
-    # score vs activity
-    plot_correlation_heatmap(activity_frequencies_df, question_scores_df, x_label="Activities", y_label="Question Scores", save_path=save_dir / "score_vs_activity_correlation_heatmap.png")
+    plot_corr_heatmap(activity_frequencies_df, personalities_df, x_label="Activities", y_label="Personality", save_path=save_dir / "activity_vs_personality_corr.png")
+    plot_corr_heatmap(activity_frequencies_df, question_scores_df, x_label="Activities", y_label="Question Scores", save_path=save_dir / "score_vs_activity_corr.png")
+    plot_corr_heatmap(personalities_df, inferred_personalities_df, x_label="True Personality", y_label="Inferred Personality", save_path=save_dir / "true_vs_inferred_personality_corr.png", figsize=(7, 6))
+    plot_corr_heatmap(question_scores_df, inferred_personalities_df, x_label="Question Scores", y_label="Inferred Personality", save_path=save_dir / "score_vs_inferred_personality_corr.png")
+    plot_corr_heatmap(activity_frequencies_df, activity_frequencies_df, x_label="Activities", y_label="Activities", save_path=save_dir / "activity_vs_activity_corr.png")
 
     # results = analyze_predictors(personalities_df, activity_frequencies_df)
     # # save results
