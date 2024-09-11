@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -80,15 +81,39 @@ def plot_corr_heatmap(x_df, y_df, x_label, y_label, figsize=(30, 15), dpi=300, s
 
     # Create heatmap
     plt.figure(figsize=figsize, dpi=dpi)
-    palette = sns.diverging_palette(220, 20, as_cmap=True)
-    sns.heatmap(corr_subset, xticklabels=True, yticklabels=True, cmap=palette, center=0)
+    palette = sns.diverging_palette(220, 20, sep=30, as_cmap=True)
+    abs_max = np.max(np.abs(corr_subset))
+    ax = sns.heatmap(corr_subset, xticklabels=True, yticklabels=True, cmap=palette, center=0, vmin=-abs_max, vmax=abs_max)
+    # colorbar title (side)
+    cbar = ax.collections[0].colorbar
+    cbar.set_label("Correlation")
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path)
+        plt.savefig(save_path.with_suffix(".pdf"))
     else:
         plt.show()
+    plt.close()
+
+
+def plot_tsne(data_df, labels, save_path):
+    from sklearn.manifold import TSNE
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    # Initialize TSNE
+    tsne = TSNE(n_components=2, random_state=42)
+    X_tsne = tsne.fit_transform(data_df)
+
+    # Plot the results
+    plt.figure(figsize=(8, 6))
+    plt.scatter(X_tsne[:, 0], X_tsne[:, 1], cmap='viridis')
+    plt.xlabel('t-SNE Component 1')
+    plt.ylabel('t-SNE Component 2')
+    plt.tight_layout()
+    plt.savefig(save_path)
     plt.close()
 
 
@@ -96,24 +121,31 @@ if __name__ == "__main__":
     from llm_gensim.separate_questions import make_sim_pipeline
 
     model_id = "claude-3-5-sonnet-20240620"
-    pipeline_name = "hexaco_state-free_activities-separate_questions"
-    # pipeline_name = "hexaco_state-question_activities-separate_questions"
+    # pipeline_name = "hexaco_state-personality_activities-separate_questions"
+    # pipeline_name = "hexaco_state-personality_factor_activities-separate_questions"
+    # pipeline_name = "hexaco_state-free_activities-separate_questions"
+    pipeline_name = "hexaco_state-question_activities-separate_questions"
     batch_name = "batch1"
 
-    pipe_dir = Path(__file__).parent / "results" / "separate_questions" / pipeline_name / model_id / batch_name / "gen"
+    
+    # num_samples = 500
+    # num_sim_steps = 100
+    
+    num_samples = 50
+    num_sim_steps = 100
+    # test_ratio = 0.2
+    
+    pipe_dir = Path(__file__).parent / "results" / "separate_questions" / "stoch_policy" / pipeline_name / model_id / batch_name / "gen"
+    # pipe_dir = Path(__file__).parent / "results" / "separate_questions" / pipeline_name / model_id / batch_name / "gen"
 
-    save_dir = save_dir / pipeline_name / model_id / batch_name
+    save_dir = save_dir / "stoch_policy" / pipeline_name / model_id / batch_name
+    save_dir /= f"num_samples{num_samples}"
     save_dir.mkdir(parents=True, exist_ok=True)
 
     pipeline_path = Path(__file__).parent / "configs" / "separate_questions" / (pipeline_name + ".yaml")
     pipeline_config = yaml.safe_load(pipeline_path.read_text())
 
     sim_pipeline = make_sim_pipeline(model_id, pipeline_config, pipe_dir)
-
-
-    num_samples = 5000
-    num_sim_steps = 500
-
 
     if not (save_dir / "personalities.csv").exists():
         personalities = []
@@ -155,11 +187,70 @@ if __name__ == "__main__":
         question_scores_df = pd.read_csv(save_dir / "question_scores.csv")
         inferred_personalities_df = pd.read_csv(save_dir / "inferred_personalities.csv")
 
+    # MSE between true and inferred personality
+    # mse = ((personalities_df - inferred_personalities_df) ** 2).mean()
+    # mse_std = ((personalities_df - inferred_personalities_df) ** 2).std()
+    # # plot MSE for each factor
+    # plt.figure(figsize=(5, 4), dpi=300)
+    # plt.plot(personalities_df.columns, mse, marker=".")
+    # # plt.fill_between(personalities_df.columns, mse - mse_std, mse + mse_std, alpha=0.2)
+    # plt.xlabel("Personality Factors")
+    # plt.xticks(rotation=45, ha="right")
+    # plt.ylabel("MSE")
+    # ax = plt.gca()
+    # ax.spines['top'].set_visible(False)
+    # ax.spines['right'].set_visible(False)
+    # plt.tight_layout()
+    # plt.savefig(save_dir / "mse.png")
+    # plt.close()
+
+    # correlation between true and inferred personality
+    X = personalities_df.to_numpy()  # n_samples x n_facets
+    Y = inferred_personalities_df.to_numpy()
+    
+    # substract the mean score of each facet across samples (approx equal to the mean in hexaco_data.yaml)
+
+    X = X - X.mean(axis=0)
+    Y = Y - Y.mean(axis=0)
+    correlations = []
+    for i in range(num_samples):
+        x = X[i]
+        y = Y[i]
+        # calculate correlation
+        # don't subtract the mean sample-wise (otherwise not able to predict new samples)
+        # x = x - x.mean()
+        # y = y - y.mean()
+        corr = np.sum(x * y) / np.sqrt(np.sum(x**2) * np.sum(y**2))
+        corr_np = np.corrcoef(x, y)[0, 1]
+        # print(f"Correlation between true and inferred personality for sample {i}: {corr}")
+        # print(f"Correlation between true and inferred personality for sample {i}: {corr_np}")
+        # print("-" * 100)
+        # breakpoint()
+        # plt.figure(figsize=(5, 4), dpi=300)
+        # plt.title(corr)
+        # plt.plot(x)
+        # plt.plot(y)
+        # plt.show()
+
+        correlations.append(corr)
+
+    print(f"Correlation: {np.mean(correlations)} +/- {np.std(correlations)}")
+    # save correlations in json
+    with open(save_dir / "metrics.json", "w") as f:
+        json.dump({
+            "correlations": correlations,
+            "correlation_std": np.std(correlations),
+            "correlation_mean": np.mean(correlations),
+        }, f, indent=4)
+
     plot_corr_heatmap(activity_frequencies_df, personalities_df, x_label="Activities", y_label="Personality", save_path=save_dir / "activity_vs_personality_corr.png")
     plot_corr_heatmap(activity_frequencies_df, question_scores_df, x_label="Activities", y_label="Question Scores", save_path=save_dir / "score_vs_activity_corr.png")
-    plot_corr_heatmap(personalities_df, inferred_personalities_df, x_label="True Personality", y_label="Inferred Personality", save_path=save_dir / "true_vs_inferred_personality_corr.png", figsize=(7, 6))
-    plot_corr_heatmap(question_scores_df, inferred_personalities_df, x_label="Question Scores", y_label="Inferred Personality", save_path=save_dir / "score_vs_inferred_personality_corr.png")
+    plot_corr_heatmap(personalities_df, inferred_personalities_df, x_label="Original Personality", y_label="Recovered Personality", save_path=save_dir / "true_vs_inferred_personality_corr.png", figsize=(7, 6))
+    plot_corr_heatmap(question_scores_df, inferred_personalities_df, x_label="Question Scores", y_label="Recovered Personality", save_path=save_dir / "score_vs_inferred_personality_corr.png")
     plot_corr_heatmap(activity_frequencies_df, activity_frequencies_df, x_label="Activities", y_label="Activities", save_path=save_dir / "activity_vs_activity_corr.png")
+
+    # plot t-SNE of activities
+    plot_tsne(activity_frequencies_df, activity_frequencies_df.idxmax(axis=1), save_path=save_dir / "tsne_activities.png")
 
     # results = analyze_predictors(personalities_df, activity_frequencies_df)
     # # save results

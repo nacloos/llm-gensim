@@ -114,7 +114,8 @@ def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=False, 
 
     if fix_state: 
         # agent state = personality
-        outputs['states'] = context_vars['states'] = factors
+        factors_str = ", ".join(factors)
+        outputs['states'] = context_vars['states'] = factors_str
 
     if no_effects:
         outputs['effects'] = {}

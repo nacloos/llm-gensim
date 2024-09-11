@@ -4,8 +4,8 @@ steps:
   actions:
     prompt: |
       <instructions>
-      Generate a diverse list of 100 concrete and common activities based on the following questions:
-      {questions}
+      Generate a diverse list of 100 concrete and common activities reflecting the following personality traits:
+      {personality_factors}
 
       Write your output as a yaml list of strings (snake case, valid python variable names). Add a comment describing each activity. Output only one yaml block.
       </instructions>
@@ -30,7 +30,7 @@ steps:
 
       <instructions>
       Write a policy to decide which activity to take given the internal state of the agent (state variables are between 0 and 100).
-      For each of the activity, write a function that takes the state as input and return the probability of taking the activity. The name of the functions are 'a1', 'a2', ..., 'a100'. Write down your reasoning first before implementing the function. Be exhaustive in your reasoning. Implement all the activity functions following the format below. Don't write the final the function for the final decision as it is already implemented.
+      For each of the activity, write a function that takes the state as input and return the probability of taking the activity. Write down your reasoning first before implementing the function. Be exhaustive in your reasoning. Implement all the activity functions following the format below. Don't write the final the function for the final decision as it is already implemented.
       </instructions>
 
       <format>
@@ -56,6 +56,32 @@ steps:
       </format>
     output_name: policy
     output_type: python
+  # policy:
+  #   prompt: |
+  #     <states>
+  #     {states}
+  #     </states>
+
+  #     <activities>
+  #     {actions}
+  #     </activities>
+      
+  #     <instructions>
+  #     Generate a policy that decides which activity to take based on the internal state of the agent. Make sure to include all activities and state variables. State variables are between 0 and 100.
+  #     Write the policy as a list of (lambda state: boolean condition, activity) tuples, where state is a dictionary {{state_variable: current_value}}, activity is the activity from the activity list above to take when the condition is satisfied by the current agent state.
+  #     First reflect and then write the python code as a single code block. Don't be lazy and write the entire code.
+  #     </instructions>
+
+  #     <format>
+  #     ```python
+  #     policy = [
+  #         (lambda state: ..., "..."),
+  #         ...
+  #     ]
+  #     ```
+  #     </format>
+  #   output_name: policy
+  #   output_type: python
 
   eval_score:
     prompt: |
@@ -95,83 +121,6 @@ steps:
       </format>
     output_name: eval_score
     output_type: python
-# steps:
-#   actions:
-#     prompt: |
-#       <questions>
-#       {questions}
-#       </questions>
-
-#       <instructions>
-#       Write a list of 200 concrete activities that I should keep track of to answer the questions above. Each action is a concrete daily activity that someone might do.
-#       Write your output as a yaml list of strings (snake case, valid python variable names). Add a comment describing each activity. Output only one yaml block.
-#       </instructions>
-
-#       <format>
-#       ```yaml
-#       - ...  # comment describing the activity
-#       ```
-#       </format>
-#     output_name: actions
-#     output_type: yaml
-
-#   policy:
-#     prompt: |
-#       <states>
-#       {states}
-#       </states>
-
-#       <activities>
-#       {actions}
-#       </activities>
-      
-#       <instructions>
-#       Generate a policy that decides which activity to take based on the internal state of the agent. Make sure to include all activities and state variables. State variables are between 0 and 100.
-#       Write the policy as a list of (lambda state: boolean condition, activity) tuples, where state is a dictionary {{state_variable: current_value}}, activity is the activity from the activity list above to take when the condition is satisfied by the current agent state.
-#       First reflect and then write the python code as a single code block. Don't be lazy and write the entire code.
-#       </instructions>
-
-#       <format>
-#       ```python
-#       policy = [
-#           (lambda state: ..., "..."),
-#           ...
-#       ]
-#       ```
-#       </format>
-#     output_name: policy
-#     output_type: python
-
-#   eval_score:
-#     prompt: |
-#       <questions>
-#       {questions}
-#       </questions>
-
-#       <activities>
-#       {actions}
-#       </activities>
-
-#       <instructions>
-#       For each question in the list above, write code that takes a history of activities (a python list) and outputs the score for that question. Each score should be between 1 and 5 (1=strongly disagree, 5=strongly agree).
-#       Implement all the questions. Don't be lazy and write the entire code.
-#       </instructions>
-            
-#       <format>
-#       <q1>
-#       def eval_q1(activities: list[str]) -> int:
-#           ...
-#       </q1>
-
-#       <q2>
-#       def eval_q2(activities: list[str]) -> int:
-#           ...
-#       </q2>
-
-#       ...
-#       </format>
-#     output_name: eval_score
-#     output_type: python
 
 # - prompt: |
 #     You are a helpful assistant.

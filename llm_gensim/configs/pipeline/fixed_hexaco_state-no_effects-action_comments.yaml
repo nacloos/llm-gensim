@@ -66,7 +66,7 @@ steps:
 #     {states}
 
 #     And the following list of factors used to evaluate someone's personality traits,
-#     {personality_factors}
+#     {personality_facets}
 
 #     Write a function to initiate an agent's internal state based on a given personality. The output state should reflect the given personality as closely as possible.
 #     The function should take a dictionary of factors and their values (between 1 and 5) and return a dictionary with the initialized state variables (between 0 and 100).

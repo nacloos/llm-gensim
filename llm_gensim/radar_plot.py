@@ -99,12 +99,13 @@ def radar_factory(num_vars, frame='circle'):
     return theta
 
 
-def plot_radar_chart(data, agent_types, spoke_labels, title):
+def plot_radar_chart(data, agent_types, spoke_labels, title, figsize=(6, 6), colors=None):
     N = len(spoke_labels)
     theta = radar_factory(N, frame='polygon')
 
-    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(projection='radar'))
-    colors = ['b', 'r', 'g', 'm', 'y', 'c', 'k', 'w', 'orange', 'purple']
+    fig, ax = plt.subplots(figsize=figsize, dpi=300, subplot_kw=dict(projection='radar'))
+    if colors is None:
+        colors = ['b', 'r', 'g', 'm', 'y', 'c', 'k', 'w', 'orange', 'purple']
 
     for d, color, label in zip(data, colors, agent_types):
         ax.plot(theta, d, color=color)

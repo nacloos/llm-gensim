@@ -10,9 +10,9 @@ from scipy.stats import pearsonr
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
-from llm_gensim.analysis import analyze, eval_single_factor, eval_random_personality, interpret_hexaco_personality
+from llm_gensim.analysis import analyze, eval_single_factor, eval_random_personality, hexaco_facets_to_factors, interpret_hexaco_personality
 from llm_gensim.llm_utils import parse_output, llm_model
-from llm_gensim.generate_sim import gen_pipeline_step, GenPipeline, GenPipelineStep, SimPipeline, Env, sample_hexaco_personality, simulate
+from llm_gensim.generate_sim import SimResult, gen_pipeline_step, GenPipeline, GenPipelineStep, SimPipeline, Env, sample_hexaco_personality, simulate
 
 
 save_dir = Path(__file__).parent / "results" / Path(__file__).stem
@@ -177,13 +177,18 @@ def policy(state: dict) -> str:
     {policy_code}
 
     # TODO: temp fix
-    state = list(state.values())
+    # state = list(state.values())
     activities = {gen_pipeline.outputs["actions"]}
 
+    import numpy as np
     activity_probabilities = np.array({proba_list})
-    activity_probabilities = activity_probabilities / activity_probabilities.sum()
+    print(activity_probabilities)
+    # softmax
+    beta = 5.0
+    p = np.exp(activity_probabilities * beta) / np.exp(activity_probabilities * beta).sum()
+    # activity_probabilities = activity_probabilities / activity_probabilities.sum()
     # sample activity
-    activity = np.random.choice(activities, p=activity_probabilities)
+    activity = np.random.choice(activities, p=p)
     return activity
 """
 
@@ -214,17 +219,20 @@ def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=True, n
     with open(hexaco_data_path, "r") as f:
         hexaco_data = yaml.safe_load(f)
 
-    factors = [d["name"] for d in hexaco_data["factors"]]
+    facets = [d["name"] for d in hexaco_data["factors"]]
+    factors = hexaco_facets_to_factors(facets)
 
     context_vars = {
         "questions": questions,
-        "personality_factors": factors
+        "personality_factors": ", ".join(factors),
+        "personality_facets": ", ".join(facets)
     }
     outputs = {}
 
     if fix_state: 
         # agent state = personality
-        outputs['states'] = context_vars['states'] = factors
+        context_vars['states'] = ", ".join(facets)
+        outputs['states'] = facets
 
     if no_effects:
         outputs['effects'] = {}
@@ -330,6 +338,162 @@ def plot_personalities(
     plt.close()
 
 
+def plot_activity_comparison(
+        sim_pipeline: SimPipeline,
+        res1: SimResult,
+        res2: SimResult,
+        label1,
+        label2,
+        save_dir
+):
+    # plot frequency of activities
+    avg_actions1 = {activity: np.mean([action == activity for action in res1.actions]) for activity in sim_pipeline.actions}
+    avg_actions2 = {activity: np.mean([action == activity for action in res2.actions]) for activity in sim_pipeline.actions}
+    
+    avg_actions_ordered1 = sorted(avg_actions1.items(), key=lambda x: x[1], reverse=True)
+    avg_actions_ordered2 = sorted(avg_actions2.items(), key=lambda x: x[1], reverse=True)
+
+    k = 3
+    top_activities1 = [activity for activity, _ in avg_actions_ordered1[:k]]
+    top_activities2 = []
+    for activity, _ in avg_actions_ordered2:
+        if activity not in top_activities1:
+            top_activities2.append(activity)
+        if len(top_activities2) == k:
+            break
+
+    top_activities = top_activities1 + top_activities2[::-1]
+
+    import seaborn as sns
+    import pandas as pd
+
+    data_df = pd.DataFrame({
+        "Activity": top_activities + top_activities,
+        "Frequency": [avg_actions1[activity] for activity in top_activities] + [avg_actions2[activity] for activity in top_activities],
+        "Group": [label1] * 2 * k + [label2] * 2 * k
+    })
+    # Get the colors from matplotlib
+    color_names = ["cornflowerblue", "coral"]
+    colors = [plt.cm.colors.to_rgb(color) for color in color_names]
+
+    sns.barplot(x="Activity", y="Frequency", hue="Group", data=data_df, palette=colors)
+    # align x labels center
+    plt.xticks(rotation=90, ha='center')
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xlabel("Activities")
+    plt.ylabel("Frequency")
+    plt.tight_layout()
+    plt.savefig(save_dir / "bar_plot_activity_comparison.png")
+    plt.savefig(save_dir / "bar_plot_activity_comparison.pdf")
+
+    # same but activities on the y axis (seaborn orient y)
+    plt.figure(figsize=(7, 3), dpi=300)
+    sns.barplot(x="Frequency", y="Activity", hue="Group", data=data_df, orient="y", palette=colors)
+    plt.xlabel("Frequency")
+    plt.ylabel("Activities")
+    # remove title from legend
+    plt.legend(title=None)
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(save_dir / "bar_plot_activity_comparison_horiz.png")
+    plt.savefig(save_dir / "bar_plot_activity_comparison_horiz.pdf")
+
+    plt.figure(figsize=(5, 3), dpi=300)
+    plt.bar(range(len(avg_actions1)), list(avg_actions1.values()), color=colors[0])
+    plt.bar(range(len(avg_actions2)), list(avg_actions2.values()), color=colors[1])
+    plt.xticks(rotation=90, ha='center')
+    plt.xlabel("Activities")
+    plt.ylabel("Frequency")
+    plt.legend([label1, label2])
+    plt.tight_layout()
+    plt.savefig(save_dir / "bar_plot_activity_comparison_single.png")
+    plt.savefig(save_dir / "bar_plot_activity_comparison_single.pdf")
+
+    plt.figure(figsize=(6, 3), dpi=300)
+    y_pos = range(len(top_activities))[::-1]
+    a1 = [avg_actions1[activity] for activity in top_activities]
+    a2 = [avg_actions2[activity] for activity in top_activities]
+    # same as edgecolor but lighter
+    facecolors = [plt.cm.colors.to_rgba(color) for color in colors]
+    facecolors = [[r, g, b, 0.3] for r, g, b, _ in facecolors]
+    plt.barh(y_pos, a2, height=0.35, edgecolor=colors[1], facecolor=facecolors[1], label=label2, align='center')
+    plt.barh([y + 0.39 for y in y_pos], a1, height=0.35, edgecolor=colors[0], facecolor=facecolors[0], label=label1, align='center')
+    plt.yticks([y + 0.195 for y in y_pos], top_activities)
+    plt.xlabel("Frequency")
+    plt.ylabel("Activities")
+    plt.legend()
+    
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    plt.savefig(save_dir / "bar_plot_activity_comparison_horiz_matplotlib.png")
+    plt.savefig(save_dir / "bar_plot_activity_comparison_horiz_matplotlib.pdf")
+    plt.close()
+
+
+def plot_personality_comparison(
+        personality1,
+        personality2,
+        inferred_personality1,
+        inferred_personality2,
+        save_dir
+):
+    plt.figure(figsize=(5, 3), dpi=300)
+    plt.plot(personality1.keys(), personality1.values(), label=f"{factor_name}=1", color="cornflowerblue", linestyle='--')
+    plt.plot(personality2.keys(), personality2.values(), label=f"{factor_name}=5", color="coral", linestyle='--')
+    # plot inferred personality
+    for inferred_personality1 in inferred_personality1:
+        plt.plot(inferred_personality1.keys(), inferred_personality1.values(), color="cornflowerblue")
+    for inferred_personality2 in inferred_personality2:
+        plt.plot(inferred_personality2.keys(), inferred_personality2.values(), color="coral")
+    plt.xlabel("Hexaco personality inventory")
+    plt.xticks(rotation=45, ha='right', fontsize=5)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(save_dir / "personality_comparison.png")
+    plt.savefig(save_dir / "personality_comparison.pdf")
+    plt.close()
+
+    # radar plot
+    from llm_gensim.radar_plot import plot_radar_chart
+
+    def _plot_radar(personality, inferred_personality, colors, save_name):
+        data = []
+        data_labels = []
+        for i, personality in enumerate([personality, inferred_personality]):
+            factors = hexaco_facets_to_factors(personality)
+            data.append(list(factors.values()).copy())
+            data_labels.append(f"Original" if i == 0 else "Recovered")
+
+        labels = factors.keys()
+        plot_radar_chart(
+            data,
+            data_labels,
+            labels,
+            title="Personality Factors",
+            figsize=(4, 4),
+            colors=colors
+        )
+        ax = plt.gca()
+        ax.set_rgrids([1, 2, 3, 4, 5])
+        ax.set_ylim(0, 5)
+        plt.savefig(save_dir / f"{save_name}.png")
+        plt.savefig(save_dir / f"{save_name}.pdf")
+
+
+    colors1 = ["black", "cornflowerblue"]
+    colors2 = ["black", "coral"]
+    _plot_radar(personality1, inferred_personality1, colors1, "radar_personality1")
+    _plot_radar(personality2, inferred_personality2, colors2, "radar_personality2")
+    plt.close('all')
+
+
 def eval_pipeline(sim_pipeline: SimPipeline, factor_name: str, num_sim_steps, num_samples, num_runs, save_dir):
     data = yaml.safe_load(open(hexaco_data_path, "r"))["factors"]
 
@@ -340,12 +504,15 @@ def eval_pipeline(sim_pipeline: SimPipeline, factor_name: str, num_sim_steps, nu
                 personality[item["name"]] = value
         return personality
 
-    def _run(personality):
+    def _run(personality, save_dir=None):
         res = simulate(sim_pipeline, personality, num_steps=num_sim_steps)
-    
+
+        if save_dir:
+            analyze(sim_pipeline, res, save_dir=save_dir)
+
         scores = sim_pipeline.eval_score(res.actions)
         inferred_personality = interpret_hexaco_personality(scores)
-        return inferred_personality
+        return res, inferred_personality
         # target = np.array(list(personality.values()))
         # pred = np.array([inferred_personality[k] for k in personality.keys()])
 
@@ -372,10 +539,29 @@ def eval_pipeline(sim_pipeline: SimPipeline, factor_name: str, num_sim_steps, nu
         inferred_personalities_low = []
         inferred_personalities_high = []
         for k in range(num_runs):
-            inferred_personality_low = _run(personality_low)
-            inferred_personality_high = _run(personality_high)
+            __save_dir = _save_dir / f"run{k}"
+
+            res_low, inferred_personality_low = _run(personality_low, save_dir=__save_dir / "low")
+            res_high, inferred_personality_high = _run(personality_high, save_dir=__save_dir / "high")
             inferred_personalities_low.append(inferred_personality_low)
             inferred_personalities_high.append(inferred_personality_high)
+
+            plot_activity_comparison(
+                sim_pipeline,
+                res_high,
+                res_low,
+                label1=f"High {factor_name}",
+                label2=f"Low {factor_name}",
+                save_dir=__save_dir
+            )
+
+            plot_personality_comparison(
+                personality_low,
+                personality_high,
+                inferred_personalities_low,
+                inferred_personalities_high,
+                save_dir=__save_dir
+            )
 
         plot_personalities(
             personality_low,
@@ -392,15 +578,17 @@ if __name__ == "__main__":
     model_id = "claude-3-5-sonnet-20240620"
 
     # pipeline_name = "hexaco_state-free_activities-no_effects-test"
-    pipeline_name = "hexaco_state-free_activities-separate_questions"
-    # pipeline_name = "hexaco_state-question_activities-separate_questions"
+    # pipeline_name = "hexaco_state-free_activities-separate_questions"
+    # pipeline_name = "hexaco_state-personality_activities-separate_questions"
+    # pipeline_name = "hexaco_state-personality_factor_activities-separate_questions"
+    pipeline_name = "hexaco_state-question_activities-separate_questions"
 
     batch_name = "batch1"
 
     fix_state = True if "hexaco_state" in pipeline_name else False
     no_effects = True if "no_effects" in pipeline_name else False
 
-    _save_dir = save_dir / pipeline_name / model_id / batch_name
+    _save_dir = save_dir / "stoch_policy" / pipeline_name / model_id / batch_name
 
     pipe_save_dir = _save_dir / "gen"
     sim_save_dir = _save_dir / "sim"
@@ -411,10 +599,12 @@ if __name__ == "__main__":
     sim_pipeline = make_sim_pipeline(model_id, pipeline_config, pipe_save_dir, fix_state, no_effects)
 
 
-    num_steps = 100
+    num_steps = 1000
+    num_samples = 1
+    num_runs = 5
     for factor_name in ["Extraversion", "Conscientiousness", "Openness to Experience", "Agreeableness", "Honesty-Humility"]:
         _save_dir = sim_save_dir / factor_name / f"num_steps{num_steps}"
-        eval_pipeline(sim_pipeline, factor_name=factor_name, num_sim_steps=num_steps, num_samples=10, num_runs=50, save_dir=_save_dir)
+        eval_pipeline(sim_pipeline, factor_name=factor_name, num_sim_steps=num_steps, num_samples=num_samples, num_runs=num_runs, save_dir=_save_dir)
     
     # run simulation
     # personality = sample_hexaco_personality()
@@ -432,6 +622,6 @@ if __name__ == "__main__":
     # )
 
     # for factor_name in ["Extraversion", "Conscientiousness", "Openness to Experience", "Agreeableness", "Honesty-Humility"]:
-    # for factor_name in ["Extraversion"]:
-    #     eval_single_factor(sim_pipeline, factor_name, 2, sim_save_dir / factor_name / "default_mean", default_value='mean')
+    for factor_name in ["Extraversion"]:
+        eval_single_factor(sim_pipeline, factor_name, 2, sim_save_dir / factor_name / "default_zero", default_value='zero')
 

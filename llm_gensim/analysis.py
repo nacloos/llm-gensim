@@ -113,17 +113,23 @@ def interpret_hexaco_personality(scores, return_details=False):
         return scores
 
 
-def hexaco_facets_to_factors(facets: dict) -> dict:
+def hexaco_facets_to_factors(facets: dict | list) -> dict | list:
     with open(hexaco_scoring_keys_path, "r") as f:
         scoring_keys = yaml.safe_load(f)
     hexaco_structure = scoring_keys["hexaco_scoring_keys"]
 
-    factor_scores = {}
+    if isinstance(facets, dict):
+        factor_scores = {}
 
-    for factor, facet_scores in hexaco_structure.items():
-        factor_scores[factor] = sum(facets[facet] for facet in facet_scores) / len(facet_scores)
-    
-    return factor_scores
+        for factor, facet_scores in hexaco_structure.items():
+            factor_scores[factor] = sum(facets[facet] for facet in facet_scores) / len(facet_scores)
+        
+        return factor_scores
+    elif isinstance(facets, list):
+        return list(hexaco_structure.keys())
+
+    else:
+        raise ValueError(f"Invalid type for facets: {type(facets)}")
 
 
 def analyze(pipeline, res, save_dir):
@@ -153,13 +159,13 @@ def analyze(pipeline, res, save_dir):
         plt.plot([state[var] for state in res.states], label=var)
     plt.legend()
     plt.savefig(save_dir / "state_vars.png")
-
+    plt.savefig(save_dir / "state_vars.pdf")
     plt.figure(figsize=(10, 5), dpi=300)
     for activity in pipeline.actions:
         plt.plot([action == activity for action in res.actions], label=activity)
     plt.legend()
     plt.savefig(save_dir / "activities.png")
-
+    plt.savefig(save_dir / "activities.pdf")
     # plot statistics
     plt.figure(figsize=(10, 5), dpi=300)
     avg_stats = {var: np.mean([state[var] for state in res.states]) for var in pipeline.states}
@@ -173,7 +179,7 @@ def analyze(pipeline, res, save_dir):
     plt.ylabel("Average value")
     plt.tight_layout()
     plt.savefig(save_dir / "avg_stats.png")
-
+    plt.savefig(save_dir / "avg_stats.pdf")
     plt.figure(figsize=(10, 5), dpi=300)
     avg_actions = {activity: np.mean([action == activity for action in res.actions]) for activity in pipeline.actions}
     plt.bar(avg_actions.keys(), avg_actions.values())
@@ -182,10 +188,40 @@ def analyze(pipeline, res, save_dir):
     ax = plt.gca()
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    # plt.xlabel("Activities")
-    # plt.ylabel("Average frequency")
+    plt.xlabel("Activities")
+    plt.ylabel("Frequency")
     plt.tight_layout()
     plt.savefig(save_dir / "avg_actions.png")
+    plt.savefig(save_dir / "avg_actions.pdf")
+
+
+    # plot actions ordered by frequency
+    avg_actions_ordered = sorted(avg_actions.items(), key=lambda x: x[1], reverse=True)
+    plt.figure(figsize=(10, 5), dpi=300)
+    plt.bar([x[0] for x in avg_actions_ordered], [x[1] for x in avg_actions_ordered])
+    plt.xticks(rotation=90, ha='center', fontsize=5)
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xlabel("Activities")
+    plt.ylabel("Frequency")
+    plt.tight_layout()
+    plt.savefig(save_dir / "avg_actions_ordered.png")
+    plt.savefig(save_dir / "avg_actions_ordered.pdf")
+
+
+    # same but show only to 20
+    plt.figure(figsize=(6, 5), dpi=300)
+    plt.bar([x[0] for x in avg_actions_ordered[:20]], [x[1] for x in avg_actions_ordered[:20]])
+    plt.xticks(rotation=90, ha='center', fontsize=7)
+    ax = plt.gca()
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.xlabel("Activities")
+    plt.ylabel("Frequency")
+    plt.tight_layout()
+    plt.savefig(save_dir / "avg_actions_ordered_top10.png")
+    plt.savefig(save_dir / "avg_actions_ordered_top10.pdf")
 
     # plot personality factors
     facet_names = list(personality.keys())
@@ -205,6 +241,7 @@ def analyze(pipeline, res, save_dir):
     plt.legend()
     plt.tight_layout()
     plt.savefig(save_dir / "personality.png")
+    plt.savefig(save_dir / "personality.pdf")
 
 
     factors = hexaco_facets_to_factors(personality)
@@ -222,6 +259,7 @@ def analyze(pipeline, res, save_dir):
     plt.legend()
     plt.tight_layout()
     plt.savefig(save_dir / "factors.png")
+    plt.savefig(save_dir / "factors.pdf")
 
 
     plt.figure(figsize=(10, 5), dpi=300)
@@ -235,11 +273,38 @@ def analyze(pipeline, res, save_dir):
     plt.ylabel("Score")
     plt.tight_layout()
     plt.savefig(save_dir / "scores.png")
+    plt.savefig(save_dir / "scores.pdf")
 
 
     if init_state is not None:
         with open(save_dir / "init_state.json", "w") as f:
             json.dump(init_state, f, indent=4)
+
+    # radar chart
+    from llm_gensim.radar_plot import plot_radar_chart
+
+    data = []
+    data_labels = []
+    for i, personality in enumerate([personality, inferred_personality]):
+        factors = hexaco_facets_to_factors(personality)
+        data.append(list(factors.values()).copy())
+        data_labels.append(f"Original" if i == 0 else "Inferred")
+
+    labels = factors.keys()
+    plot_radar_chart(
+        data,
+        data_labels,
+        labels,
+        title="Personality Factors",
+        figsize=(4, 4)
+    )
+    ax = plt.gca()
+    ax.set_rgrids([1, 2, 3, 4, 5])
+    ax.set_ylim(0, 5)
+    plt.savefig(save_dir / "factors_radar.png")
+    plt.savefig(save_dir / "factors_radar.pdf")
+    plt.close('all')
+
 
     # TODO: require some constraints on the eval_scores generated code
     # # plot list of activities used in eval_scores for each personality factor
@@ -415,9 +480,7 @@ def eval_single_factor(sim_pipeline: SimPipeline, factor_name: str, num_values, 
     with open(save_dir / "metrics.yaml", "w") as f:
         yaml.dump(metrics, f)
 
-    # plot personalities
-    import matplotlib.pyplot as plt
-    
+    # plot personalities    
     plt.figure(figsize=(5, 3), dpi=300)
     x_labels = list(results["personality"][0].keys())
     colors = ["cornflowerblue", "coral"]
