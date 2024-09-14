@@ -102,7 +102,11 @@ def eval_score(activities: list[str]) -> list[int]:
     # eval questions
     {questions_code}
     
-    return {score_list}
+    scores = {score_list}
+    # import matplotlib.pyplot as plt
+    # plt.plot(scores)
+    # plt.show()
+    return scores
 """
     with open(save_dir / "eval_score.py", "w") as f:
         f.write(code)
@@ -169,7 +173,7 @@ def make_policy_code(gen_pipeline: GenPipeline, step: GenPipelineStep, save_dir)
     proba_list = "[" + ", ".join([f"a{i}(state)" for i in range(1, len(gen_pipeline.outputs["actions"])+1)]) + "]"
 
     code = f"""
-def policy(state: dict) -> str:
+def policy(state: dict, beta=5.0, rng=None) -> str:
     # utils
     {utils_code}
 
@@ -182,13 +186,14 @@ def policy(state: dict) -> str:
 
     import numpy as np
     activity_probabilities = np.array({proba_list})
-    print(activity_probabilities)
     # softmax
-    beta = 5.0
     p = np.exp(activity_probabilities * beta) / np.exp(activity_probabilities * beta).sum()
     # activity_probabilities = activity_probabilities / activity_probabilities.sum()
     # sample activity
-    activity = np.random.choice(activities, p=p)
+    if rng is not None:
+        activity = rng.choice(activities, p=p)
+    else:
+        activity = np.random.choice(activities, p=p)
     return activity
 """
 
@@ -209,8 +214,24 @@ def policy(state: dict) -> str:
     return
 
 
-def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=True, no_effects=True) -> SimPipeline:
+def load_pipeline(pipeline_path) -> SimPipeline:
+    assert pipeline_path.exists(), f"Pipeline path {pipeline_path} does not exist"
+    # load config
+    with open(pipeline_path / "config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+
+    pipeline = make_sim_pipeline(config["model_id"], config, pipeline_path)
+    return pipeline
+
+
+def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=True, no_effects=True, eval_freq=False) -> SimPipeline:
     llm = llm_model(model_id)
+
+    # save config
+    save_dir.mkdir(parents=True, exist_ok=True)
+    with open(save_dir / "config.yaml", "w") as f:
+        gen_pipeline_config["model_id"] = model_id
+        yaml.dump(gen_pipeline_config, f)
 
     # load data
     with open(hexaco_questions_path, "r") as f:
@@ -271,13 +292,26 @@ def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=True, n
 
     pipeline.outputs["effects"] = {}
 
+    if not eval_freq:
+        eval_score = pipeline.outputs["eval_score"]
+    else:
+        def eval_score(activities):
+            # compute the freq of each activity in the list
+            activity_freq = {str(activity): activities.count(activity) for activity in activities}
+            # normalize by the total number of activities
+            total_activities = len(activities)
+            activity_freq = {activity: count / total_activities for activity, count in activity_freq.items()}
+            # assert sum close to 1
+            assert np.allclose(sum(activity_freq.values()), 1), f"Sum of activity frequencies is not 1: {sum(activity_freq.values())}"
+            return pipeline.outputs["eval_score"](activity_freq)
+
     return SimPipeline(
         actions=pipeline.outputs["actions"],
         states=pipeline.outputs["states"],
         effects=pipeline.outputs["effects"],
         init_state_fn=pipeline.outputs["init_state"],
         policy=pipeline.outputs["policy"],
-        eval_score=pipeline.outputs["eval_score"]
+        eval_score=eval_score
     )
 
 
@@ -286,6 +320,7 @@ def plot_personalities(
         personality_high,
         inferred_personalities_low,
         inferred_personalities_high,
+        factor_name,
         save_dir
 ):
     # plot personality vs inferred personality
@@ -442,6 +477,7 @@ def plot_personality_comparison(
         personality2,
         inferred_personality1,
         inferred_personality2,
+        factor_name,
         save_dir
 ):
     plt.figure(figsize=(5, 3), dpi=300)
@@ -560,6 +596,7 @@ def eval_pipeline(sim_pipeline: SimPipeline, factor_name: str, num_sim_steps, nu
                 personality_high,
                 inferred_personalities_low,
                 inferred_personalities_high,
+                factor_name,
                 save_dir=__save_dir
             )
 
@@ -568,6 +605,7 @@ def eval_pipeline(sim_pipeline: SimPipeline, factor_name: str, num_sim_steps, nu
             personality_high,
             inferred_personalities_low,
             inferred_personalities_high,
+            factor_name,
             save_dir / f"sample{i}"
         )
 
@@ -576,30 +614,35 @@ def eval_pipeline(sim_pipeline: SimPipeline, factor_name: str, num_sim_steps, nu
 
 if __name__ == "__main__":
     model_id = "claude-3-5-sonnet-20240620"
+    batch_name = "batch2"
 
-    # pipeline_name = "hexaco_state-free_activities-no_effects-test"
-    # pipeline_name = "hexaco_state-free_activities-separate_questions"
+    pipeline_name = "hexaco_state-free_activities-separate_questions"
     # pipeline_name = "hexaco_state-personality_activities-separate_questions"
     # pipeline_name = "hexaco_state-personality_factor_activities-separate_questions"
-    pipeline_name = "hexaco_state-question_activities-separate_questions"
-
-    batch_name = "batch1"
-
+    # pipeline_name = "hexaco_state-question_activities-separate_questions"
     fix_state = True if "hexaco_state" in pipeline_name else False
     no_effects = True if "no_effects" in pipeline_name else False
-
+    eval_freq = False
     _save_dir = save_dir / "stoch_policy" / pipeline_name / model_id / batch_name
+    pipeline_path = Path(__file__).parent / "configs" / "separate_questions" / (pipeline_name + ".yaml")
+
+    # pipeline_name = "personality_activities"
+    # fix_state = True
+    # no_effects = True
+    # eval_freq = True
+    # _save_dir = save_dir / "eval_freq" / pipeline_name / model_id / batch_name
+    # pipeline_path = Path(__file__).parent / "configs" / "eval_freq" / (pipeline_name + ".yaml")
+
 
     pipe_save_dir = _save_dir / "gen"
     sim_save_dir = _save_dir / "sim"
 
-    pipeline_path = Path(__file__).parent / "configs" / "separate_questions" / (pipeline_name + ".yaml")
     pipeline_config = yaml.safe_load(pipeline_path.read_text())
 
-    sim_pipeline = make_sim_pipeline(model_id, pipeline_config, pipe_save_dir, fix_state, no_effects)
+    sim_pipeline = make_sim_pipeline(model_id, pipeline_config, pipe_save_dir, fix_state, no_effects, eval_freq)
 
 
-    num_steps = 1000
+    num_steps = 500
     num_samples = 1
     num_runs = 5
     for factor_name in ["Extraversion", "Conscientiousness", "Openness to Experience", "Agreeableness", "Honesty-Humility"]:

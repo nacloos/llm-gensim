@@ -3,6 +3,7 @@ from pathlib import Path
 import random
 from typing import Any, Callable
 import numpy as np
+from tqdm import tqdm
 import yaml
 
 from llm_gensim.llm_utils import parse_output, llm_model
@@ -163,7 +164,11 @@ def make_sim_pipeline(model_id, gen_pipeline_config, save_dir, fix_state=False, 
 def agent_step(state, policy, env: Env):
     # TODO: temp fix
     if isinstance(policy, Callable):
-        return policy(state)
+        try:
+            return policy(state)
+        except Exception as e:
+            print(f"Policy {policy} failed with error: {e}")
+            return random.choices(env.actions, k=1)[0]
     else:
         assert isinstance(policy, list), "Policy must be a list of conditions and activities"
 
@@ -232,12 +237,11 @@ def simulate(sim_pipeline: SimPipeline, personality, num_steps=100) -> SimResult
     state = init_state.copy()
     states = [state]
     actions = []
-    for _ in range(num_steps):
+    for _ in tqdm(range(num_steps), desc="Simulating steps", unit="step"):
         action = agent_step(state, policy, env)
         state = env_step(state, action, env)
         states.append(state.copy())
         actions.append(action)
-
     average_states = {var: np.mean([state[var] for state in states]) for var in env.states}
     average_actions = {activity: np.mean([action == activity for action in actions]) for activity in env.actions}
 

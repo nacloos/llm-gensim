@@ -1,0 +1,97 @@
+system_prompt: "You are a software engineer at a major tech company with a strong background in psychology."
+
+steps:
+  actions:
+    prompt: |
+      <instructions>
+      Generate a diverse list of 100 concrete and common activities reflecting the following personality traits:
+      {personality_facets}
+
+      Write your output as a yaml list of strings (snake case, valid python variable names). Add a comment describing each activity. Output only one yaml block.
+      </instructions>
+
+      <format>
+      ```yaml
+      - ...  # comment describing the activity
+      ```
+      </format>
+    output_name: actions
+    output_type: yaml
+
+  policy:
+    prompt: |
+      <states>
+      {states}
+      </states>
+
+      <activities>
+      {actions}
+      </activities>
+
+      <instructions>
+      Write a policy to decide which activity to take given the internal state of the agent (state variables are between 0 and 100).
+      For each of the activity, write a function that takes the state as input and return the probability of taking the activity. The name of the functions are 'a1', 'a2', ..., 'a100'. Write down your reasoning first before implementing the function. Be exhaustive in your reasoning. Implement all the activity functions following the format below. Don't write the final the function for the final decision as it is already implemented.
+      </instructions>
+
+      <format>
+      <utils>
+      # include optional imports here
+      # include optional utility functions here
+      </utils>
+
+      <a1>
+      # don't change the function names
+      def a1(state: dict[str, float]) -> float:
+        # TODO: reasoning
+        # TODO: code
+      </a1>
+
+      <a2>
+      def a2(state: dict[str, float]) -> float:
+        # TODO: reasoning
+        # TODO: code
+      </a2>
+
+      # TODO: implement all the other activities
+      </format>
+    output_name: policy
+    output_type: python
+
+  eval_score:
+    prompt: |
+      <questions>
+      {questions}
+      </questions>
+
+      <activities>
+      {actions}
+      </activities>
+
+      <instructions>
+      For each question in the list above, write code that takes a dict with the normalized frequency of the activities taken by the agent and outputs the score for that question. The frequency of an activity is defined as the number of time the agent has taken that activity divided by the total number of activities taken by the agent (frequency is a number between 0 and 1). Each output score should be between 1 and 5 (1=strongly disagree, 5=strongly agree).
+      Implement all the questions. Don't be lazy and write the entire code.
+      </instructions>
+            
+      <format>
+      <utils>
+      # include optimal imports here
+      # include optimal utility functions here
+      </utils>
+
+      # don't change the function names
+      <q1>
+      def q1(activities: list[str]) -> int:
+          # TODO: reasoning
+          # TODO: code
+      </q1>
+
+      <q2>
+      def q2(activities: list[str]) -> int:
+          # TODO: reasoning
+          # TODO: code
+      </q2>
+
+      # TODO: implement all the other questions
+      </format>
+    output_name: eval_score
+    output_type: python

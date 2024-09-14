@@ -123,23 +123,22 @@ if __name__ == "__main__":
     model_id = "claude-3-5-sonnet-20240620"
     # pipeline_name = "hexaco_state-personality_activities-separate_questions"
     # pipeline_name = "hexaco_state-personality_factor_activities-separate_questions"
-    # pipeline_name = "hexaco_state-free_activities-separate_questions"
-    pipeline_name = "hexaco_state-question_activities-separate_questions"
-    batch_name = "batch1"
-
+    pipeline_name = "hexaco_state-free_activities-separate_questions"
+    # pipeline_name = "hexaco_state-question_activities-separate_questions"
+    batch_name = "batch3"
     
     # num_samples = 500
     # num_sim_steps = 100
     
-    num_samples = 50
-    num_sim_steps = 100
+    num_samples = 100
+    num_sim_steps = 500
     # test_ratio = 0.2
     
     pipe_dir = Path(__file__).parent / "results" / "separate_questions" / "stoch_policy" / pipeline_name / model_id / batch_name / "gen"
     # pipe_dir = Path(__file__).parent / "results" / "separate_questions" / pipeline_name / model_id / batch_name / "gen"
 
     save_dir = save_dir / "stoch_policy" / pipeline_name / model_id / batch_name
-    save_dir /= f"num_samples{num_samples}"
+    save_dir /= f"num_samples{num_samples}-num_steps{num_sim_steps}"
     save_dir.mkdir(parents=True, exist_ok=True)
 
     pipeline_path = Path(__file__).parent / "configs" / "separate_questions" / (pipeline_name + ".yaml")
@@ -221,7 +220,7 @@ if __name__ == "__main__":
         # x = x - x.mean()
         # y = y - y.mean()
         corr = np.sum(x * y) / np.sqrt(np.sum(x**2) * np.sum(y**2))
-        corr_np = np.corrcoef(x, y)[0, 1]
+        # corr_np = np.corrcoef(x, y)[0, 1]
         # print(f"Correlation between true and inferred personality for sample {i}: {corr}")
         # print(f"Correlation between true and inferred personality for sample {i}: {corr_np}")
         # print("-" * 100)

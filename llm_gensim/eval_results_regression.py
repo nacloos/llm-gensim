@@ -40,9 +40,12 @@ if __name__ == "__main__":
     results_df = pd.DataFrame(results)
     results_df.to_csv(save_dir / "results.csv", index=False)
     
+    # order pipelines by correlation mean
+    results_df = results_df.sort_values(by="correlation_mean", ascending=False)
+
     # bar plot
     plt.figure(figsize=(5, 4), dpi=300)
-    plt.bar(results_df["pipeline"], results_df["correlation_mean"], yerr=results_df["correlation_std"], capsize=5, color="thistle")
+    plt.bar(results_df["pipeline"], results_df["correlation_mean"], yerr=results_df["correlation_std"], capsize=5, color="thistle", ecolor="#636363")
     plt.ylabel("Correlation between\noriginal and recovered personalities")
     x_labels = [legend_names[p] for p in results_df["pipeline"]]
     plt.xticks(results_df["pipeline"], x_labels)
@@ -51,4 +54,5 @@ if __name__ == "__main__":
     ax.spines['right'].set_visible(False)
     plt.tight_layout()
     plt.savefig(save_dir / "bar_plot.png")
+    plt.savefig(save_dir / "bar_plot.pdf")
     plt.close()

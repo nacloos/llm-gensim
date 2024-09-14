@@ -132,6 +132,17 @@ def hexaco_facets_to_factors(facets: dict | list) -> dict | list:
         raise ValueError(f"Invalid type for facets: {type(facets)}")
 
 
+def set_personality_factor(personality, factor_name, value):
+    with open(hexaco_data_path, "r") as f:
+        data = yaml.safe_load(f)["factors"]
+
+    personality = personality.copy()
+    for item in data:
+        if item["category"] == factor_name:
+            personality[item["name"]] = value
+    return personality
+
+
 def analyze(pipeline, res, save_dir):
     save_dir.mkdir(parents=True, exist_ok=True)
 
