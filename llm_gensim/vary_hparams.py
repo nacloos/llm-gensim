@@ -24,20 +24,21 @@ def plot_correlations_num_steps_beta(results, save_dir):
     stds = results["std_correlation"]
     
     # Create a scatter plot with error bars
-    plt.figure(figsize=(5, 4))
+    plt.figure(figsize=(4, 3), dpi=300)
     for i, beta in enumerate(set(betas)):
         mask = np.array(betas) == beta
         plt.errorbar(np.array(num_steps)[mask], np.array(means)[mask], 
                      yerr=np.array(stds)[mask], marker='o', label=f'beta={beta}')
     
     plt.xlabel('Number of simulation steps')
-    plt.ylabel('Correlation between\n original and recovered personality')
+    plt.ylabel('Correlation between original\nand recovered personalities')
     plt.legend()
     ax = plt.gca()
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     plt.tight_layout()
     plt.savefig(save_dir / "num_steps_beta_correlations.png")
+    plt.savefig(save_dir / "num_steps_beta_correlations.pdf")
     plt.close()
 
 
@@ -149,7 +150,7 @@ if __name__ == "__main__":
     ]
 
     num_fit_samples = 10
-    num_test_samples = 10
+    num_test_samples = 100
     eval_save_dir = save_dir / "eval_hparams" / "stoch_policy"
     fit_save_dir = save_dir / "fit_hparams" / "stoch_policy"
 
@@ -174,6 +175,7 @@ if __name__ == "__main__":
             results["model"].append(model_name)
             results["num_steps"].append(best_hparams["num_steps"])
             results["beta"].append(best_hparams["beta"])
+            results["num_samples"].append(num_fit_samples)
 
     best_hparams_df = pd.DataFrame(results)
     best_hparams_df.to_csv(fit_save_dir / "best_hparams.csv", index=False)
@@ -226,37 +228,38 @@ if __name__ == "__main__":
             eval_results["beta"].append(beta)
             eval_results["mean_correlation"].append(np.mean(res["correlations"]))
             eval_results["std_correlation"].append(np.std(res["correlations"]))
-
+            eval_results["num_samples"].append(num_test_samples)
     eval_results_df = pd.DataFrame(eval_results)
     eval_results_df.to_csv(eval_save_dir / "eval_results.csv", index=False)
 
 
     # bar plot
     legend_names = {
+        "hexaco_state-personality_activities-separate_questions": "Personality\ntraits",
+        "hexaco_state-question_activities-separate_questions": "Questions",
         "hexaco_state-free_activities-separate_questions": "None",
         # "hexaco_state-personality_factor_activities-separate_questions": "Personality\nfactors",
-        "hexaco_state-question_activities-separate_questions": "Questions",
-        "hexaco_state-personality_activities-separate_questions": "Personality\ntraits",
     }
     colors = {
-        "hexaco_state-free_activities-separate_questions": "thistle",
+        "hexaco_state-free_activities-separate_questions": "yellowgreen",
         "hexaco_state-question_activities-separate_questions": "coral",
         "hexaco_state-personality_activities-separate_questions": "cornflowerblue",
     }
 
-    plt.figure(figsize=(5, 4), dpi=300)
+    plt.figure(figsize=(4, 3), dpi=300)
 
-    for i, config in enumerate(config_names):
+    for i, config in enumerate(legend_names.keys()):
         # scatter plot with mean and error bar with non-random jitter
         means = eval_results_df[eval_results_df["config"] == config]["mean_correlation"]
         stds = eval_results_df[eval_results_df["config"] == config]["std_correlation"]
-        jitter = np.linspace(-0.1, 0.1, len(means))
+        jitter = np.linspace(-0.15, 0.15, len(means))
         plt.errorbar(i + jitter, means, yerr=stds, capsize=5, color=colors[config], ecolor=colors[config], marker="o",  ls="none")
         # plt.scatter(i + jitter, means, label=config, color=colors[config], zorder=10)
 
     plt.ylabel("Correlation between original\nand recovered personalities")
-    x_labels = np.unique([legend_names[p] for p in eval_results_df["config"]])
+    x_labels = [legend_names[p] for p in legend_names.keys()]
     plt.xticks(np.arange(len(x_labels)), x_labels)
+    plt.xlabel("Contextual information")
     ax = plt.gca()
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
