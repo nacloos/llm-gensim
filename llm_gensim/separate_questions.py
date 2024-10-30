@@ -592,10 +592,10 @@ def eval_pipeline(sim_pipeline: SimPipeline, factor_name: str, num_sim_steps, nu
             )
 
             plot_personality_comparison(
-                personality_low,
                 personality_high,
-                inferred_personalities_low,
+                personality_low,
                 inferred_personalities_high,
+                inferred_personalities_low,
                 factor_name,
                 save_dir=__save_dir
             )
